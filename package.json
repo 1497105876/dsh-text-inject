@@ -1,0 +1,53 @@
+{
+  "name": "@gw/dsh-text-inject",
+  "version": "1.0.0",
+  "description": "在 dsh 官方设置页左侧栏添加「文字注入」：把文字注入系统提示词或会话上下文，内容存于独立文件，支持热加载与历史备份。Text injection into the system prompt or session context from a DSH Settings page, persisted in a standalone file with hot-reload and history.",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "inject.md",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "dsh-web",
+    "text-inject",
+    "system-prompt",
+    "context-injection",
+    "文字注入",
+    "提示词注入",
+    "上下文注入"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    },
+    "compatibility": {
+      "dshReleases": {
+        "0.1.2-rc.1": "compatible",
+        "0.1.5-rc.1": "compatible",
+        "0.1.5-rc.2": "compatible"
+      }
+    }
+  }
+}

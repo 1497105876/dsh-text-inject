@@ -1,0 +1,60 @@
+# ── 依赖 ──────────────────────────────────────────────
+node_modules/
+.pnpm-store/
+jspm_packages/
+
+# ── 构建产物 ──────────────────────────────────────────
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# ── 运行时数据（用户数据不属于仓库）────────────────────
+# inject.md 的「种子模板」是包的一部分要入库；
+# 但用户在 ~/.dsh/text-inject/ 下产生的数据/备份不在这里。
+history/
+*.history
+data/
+
+# ── dsh / cordis 运行时产物 ───────────────────────────
+.dsh-module-fallback/
+.dsh-market/
+cordis.yml
+*.patch.yml.bak
+cordis.patch.yml.bak*
+
+# ── 日志 ──────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# ── 环境与密钥 ────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.credentials.yaml
+
+# ── 编辑器 / 系统 ─────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── 临时文件 ──────────────────────────────────────────
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+.tmp/
+.temp/
+__pycache__/

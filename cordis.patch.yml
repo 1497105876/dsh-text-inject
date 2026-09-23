@@ -1,0 +1,12 @@
+# @gw/dsh-text-inject profile patch layer — insert one loader entry.
+#
+# The browser half is picked up by dsh-client-modules through the package's
+# dsh.client declaration, exactly like the shipped ui-* packages.
+#
+# 安装：包放进 profiles/<profile>/node_modules/@gw/dsh-text-inject/ 后，
+# 在对应 profile 的 cordis.patch.yml 追加同样的 insert 块（或在包被 dsh
+# 识别后由 dsh.bundle.patch 自动接入）。
+# 卸载：删掉该 insert 块 + 删除 node_modules/@gw/dsh-text-inject/。
+- insert:
+    - id: gw-text-inject
+      name: '@gw/dsh-text-inject'

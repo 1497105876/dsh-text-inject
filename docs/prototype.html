@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>dsh-text-inject · 梳理 / 诊断 / 重做原型</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#151a22; --panel2:#1b2230; --line:#242c3a;
+    --fg:#e6ebf5; --dim:#8b97ad; --dim2:#6b7688;
+    --acc:#7c9cff; --acc2:#4fd6c1; --warn:#ffb454; --bad:#ff6b7a; --ok:#5fd08a;
+    --mono:ui-monospace,SFMono-Regular,"JetBrains Mono",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 600px at 15% -10%,#1a2333 0%,transparent 60%),var(--bg);
+    color:var(--fg);
+    font:14px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    padding:0 0 80px;
+  }
+  a{color:var(--acc)}
+  code,pre,kbd{font-family:var(--mono)}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 22px}
+
+  /* ── header ── */
+  header{padding:38px 0 10px}
+  .kick{font-family:var(--mono);font-size:12px;color:var(--acc2);letter-spacing:.14em}
+  h1{margin:6px 0 8px;font-size:30px;letter-spacing:-.5px}
+  h1 small{font-size:14px;color:var(--dim);font-weight:400;letter-spacing:0}
+  .lede{color:var(--dim);max-width:820px}
+  .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .chip{font-family:var(--mono);font-size:11.5px;padding:3px 9px;border:1px solid var(--line);border-radius:999px;color:var(--dim);background:#121821}
+  .chip b{color:var(--fg);font-weight:600}
+
+  /* ── tabs ── */
+  nav.tabs{position:sticky;top:0;z-index:20;margin:22px 0 26px;background:rgba(14,17,22,.86);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  nav.tabs .inner{max-width:1180px;margin:0 auto;padding:0 22px;display:flex;gap:4px;overflow-x:auto}
+  nav.tabs button{
+    appearance:none;background:none;border:0;border-bottom:2px solid transparent;color:var(--dim);
+    padding:13px 14px;font:inherit;font-size:13.5px;cursor:pointer;white-space:nowrap
+  }
+  nav.tabs button:hover{color:var(--fg)}
+  nav.tabs button.on{color:var(--fg);border-bottom-color:var(--acc)}
+  nav.tabs button i{font-family:var(--mono);font-style:normal;color:var(--dim2);margin-right:6px;font-size:12px}
+  section[data-pane]{display:none}
+  section[data-pane].on{display:block;animation:fade .22s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  /* ── generic ── */
+  h2{font-size:19px;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h3{font-size:15px;margin:20px 0 8px}
+  p{margin:9px 0}
+  .muted{color:var(--dim)}
+  .mono{font-family:var(--mono)}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 16px}
+  .card.click{cursor:pointer;transition:.16s border-color,.16s transform}
+  .card.click:hover{border-color:#36415a;transform:translateY(-1px)}
+  .card h3{margin:0 0 6px;font-size:14.5px;display:flex;align-items:center;gap:8px}
+  .card p{margin:6px 0 0;color:var(--dim);font-size:13px}
+  .card .more{display:none;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
+  .card.open .more{display:block}
+  .card.open{border-color:#3a4661}
+  .tag{font-family:var(--mono);font-size:10.5px;padding:2px 7px;border-radius:5px;border:1px solid var(--line);color:var(--dim)}
+  .tag.sys{color:#9db4ff;border-color:#2c3a5e;background:#161e2e}
+  .tag.ctx{color:#7fe3d2;border-color:#1f4a45;background:#13211f}
+  .tag.bad{color:var(--bad);border-color:#5a2730;background:#241518}
+  .tag.warn{color:var(--warn);border-color:#5b4526;background:#241d12}
+  .tag.ok{color:var(--ok);border-color:#24503a;background:#12211a}
+  pre.code{background:#0b0f14;border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow:auto;font-size:12.5px;line-height:1.6;margin:10px 0}
+  pre.code .c{color:#66748c}
+  pre.code .k{color:#c792ea}
+  pre.code .s{color:#a5d6a7}
+  pre.code .n{color:#e0af68}
+  pre.code .bad{color:#ff8794;text-decoration:underline wavy #ff8794 1px;text-underline-offset:3px}
+  pre.code .good{color:#7fe3a8}
+  ul.tight{margin:8px 0 8px 18px;padding:0}
+  ul.tight li{margin:4px 0;color:var(--dim)}
+  ul.tight li b{color:var(--fg);font-weight:600}
+  .flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;margin:14px 0}
+  .flow .node{flex:1;min-width:150px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:12.5px}
+  .flow .node b{display:block;font-size:12px;color:var(--acc2);font-family:var(--mono);margin-bottom:4px}
+  .flow .arrow{display:flex;align-items:center;padding:0 8px;color:var(--dim2)}
+
+  /* ── prototype ── */
+  .proto{background:#0b0e13;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:16px 0}
+  .proto .bar{display:flex;align-items:center;gap:8px;padding:9px 13px;background:#121822;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--dim)}
+  .proto .bar .dots{display:flex;gap:5px}
+  .proto .bar .dots i{width:9px;height:9px;border-radius:50%;background:#2b3446;display:block}
+  .proto .body{display:grid;grid-template-columns:250px 1fr 1fr;min-height:520px}
+  @media (max-width:1000px){.proto .body{grid-template-columns:1fr}}
+  .col{border-right:1px solid var(--line);min-width:0}
+  .col:last-child{border-right:0}
+  .colhd{padding:10px 13px;font-size:11.5px;letter-spacing:.06em;color:var(--dim2);font-family:var(--mono);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  .colbd{padding:11px 12px;overflow:auto;max-height:640px}
+
+  .navitem{display:flex;align-items:center;gap:8px;padding:8px 9px;border-radius:8px;font-size:13px;color:var(--dim)}
+  .navitem.on{background:#1d2534;color:var(--fg)}
+  .navitem .ic{width:7px;height:7px;border-radius:2px;background:var(--acc)}
+  .navitem.ghost{opacity:.5}
+
+  .blk{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 11px;margin-bottom:9px;cursor:pointer;transition:.15s}
+  .blk:hover{border-color:#37425a}
+  .blk.sel{border-color:var(--acc);box-shadow:0 0 0 1px rgba(124,156,255,.35)}
+  .blk .r1{display:flex;align-items:center;gap:7px}
+  .blk .nm{font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .blk .r2{margin-top:5px;font-size:11.5px;color:var(--dim2);font-family:var(--mono);display:flex;gap:9px;flex-wrap:wrap}
+  .blk.off{opacity:.45}
+  .sw{width:30px;height:17px;border-radius:99px;background:#2a3346;position:relative;flex:none;transition:.15s}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#8b97ad;transition:.15s}
+  .sw.on{background:#274a3a}
+  .sw.on::after{left:15px;background:var(--ok)}
+
+  .addbar{display:flex;gap:7px;margin:2px 0 11px}
+  button.btn{appearance:none;font:inherit;font-size:12px;padding:6px 11px;border-radius:8px;border:1px solid var(--line);background:#182031;color:var(--fg);cursor:pointer}
+  button.btn:hover{border-color:#3d4a66;background:#1d2740}
+  button.btn.pri{background:#243355;border-color:#3a4f7d}
+  button.btn.sm{padding:3px 8px;font-size:11.5px}
+  button.btn.danger:hover{border-color:#6a2c34;background:#2a171b;color:#ffb0b8}
+
+  label.f{display:block;margin:11px 0 4px;font-size:11.5px;color:var(--dim);font-family:var(--mono)}
+  input.f,textarea.f,select.f{width:100%;background:#0c1118;border:1px solid var(--line);border-radius:8px;color:var(--fg);font:inherit;font-size:13px;padding:7px 9px;outline:none}
+  input.f:focus,textarea.f:focus,select.f:focus{border-color:var(--acc)}
+  textarea.f{min-height:140px;font-family:var(--mono);font-size:12.5px;resize:vertical;line-height:1.6}
+  .inline{display:flex;gap:10px}
+  .inline>div{flex:1;min-width:0}
+  .hint{font-size:11.5px;color:var(--dim2);margin-top:5px}
+  .err{font-size:11.5px;color:var(--bad);margin-top:5px}
+  .warnline{font-size:11.5px;color:var(--warn);margin-top:5px}
+
+  .prev{background:#0a0d12;border:1px solid var(--line);border-radius:9px;padding:10px 11px;font-family:var(--mono);font-size:11.8px;line-height:1.65;white-space:pre-wrap;word-break:break-word;max-height:260px;overflow:auto}
+  .prev .mine{background:rgba(124,156,255,.14);border-left:2px solid var(--acc);display:block;padding:2px 0 2px 7px;margin:2px 0}
+  .prev .offi{color:#7b8798}
+  .prev .ln{color:#3f4a5e}
+  .segbar{display:flex;gap:6px;margin-bottom:9px;flex-wrap:wrap}
+  .segbar button{appearance:none;font:inherit;font-size:12px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:#141b27;color:var(--dim);cursor:pointer}
+  .segbar button.on{background:#223055;border-color:#3d5285;color:var(--fg)}
+  .kv{display:flex;justify-content:space-between;font-size:11.5px;font-family:var(--mono);color:var(--dim2);padding:3px 0;border-bottom:1px dotted #1e2635}
+  .kv b{color:var(--fg);font-weight:600}
+  .badge{font-family:var(--mono);font-size:10.5px;padding:1px 6px;border-radius:4px;background:#1a2233;border:1px solid var(--line);color:var(--dim)}
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <div class="kick">@gw/dsh-text-inject</div>
+  <h1>文字注入插件 · 梳理 → 诊断 → 重做<small>　DeepSeek Harness 插件工作台</small></h1>
+  <p class="lede">
+    这份页面分四块：<b>现状梳理</b>（它现在到底做了什么）、<b>问题诊断</b>（为什么「不太好用」，都对着源码和官方类型定义查的）、
+    <b>目标效果原型</b>（可直接点的交互稿）、<b>技术方案</b>（要动哪几个文件、怎么改）。
+  </p>
+  <div class="meta">
+    <span class="chip">name <b>@gw/dsh-text-inject</b></span>
+    <span class="chip">version <b>1.0.0</b></span>
+    <span class="chip">host <b>lib/index.js</b> 12.9K</span>
+    <span class="chip">client <b>lib/client.js</b> 27.8K</span>
+    <span class="chip">parser <b>lib/parser.js</b> 3.6K</span>
+    <span class="chip">profile <b>web</b></span>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <div class="inner">
+    <button data-go="0" class="on"><i>01</i>现状梳理</button>
+    <button data-go="1"><i>02</i>问题诊断</button>
+    <button data-go="2"><i>03</i>目标效果（可交互原型）</button>
+    <button data-go="3"><i>04</i>技术方案</button>
+  </div>
+</nav>
+
+<!-- ══════════════════ 01 现状 ══════════════════ -->
+<section data-pane class="on">
+  <div class="wrap">
+    <h2>一句话概括</h2>
+    <p>
+      在 dsh 官方<b>设置页左侧栏</b>加一个「文字注入」分区：把两段文本分别注入到
+      <span class="tag sys">system</span> <b>系统提示词</b>（每轮生效）或
+      <span class="tag ctx">context</span> <b>会话上下文</b>（合成一条 user 消息）。
+      内容写在你自己的一份 <code>inject.md</code> 里，改文件即热加载，每次保存自动留备份。
+    </p>
+
+    <h2>运行链路</h2>
+    <div class="flow">
+      <div class="node"><b>inject.md</b>用户数据文件<br><span class="muted">~/.dsh/text-inject/</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>parser.js</b>纯解析<br><span class="muted">块头正则 + 元数据行</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>host lib/index.js</b>system 段注册<br><span class="muted">ctx.systemPrompt.section()</span></div>
+      <div class="arrow">+</div>
+      <div class="node"><b>agent/pre-step</b>合成 user 消息<br><span class="muted">prepend:true</span></div>
+    </div>
+    <div class="flow">
+      <div class="node"><b>client lib/client.js</b>settings.section<br><span class="muted">id=gw-text-inject, order=60</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>同源 fetch</b>/gw-text-inject/*<br><span class="muted">webServer prefix 路由</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>GET /state</b>读<br><span class="muted">POST /save · /restore</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>history/</b>自动备份<br><span class="muted">上限 30 份</span></div>
+    </div>
+
+    <h2>功能清单（点开看实现）</h2>
+    <div class="grid g2" id="featGrid"></div>
+
+    <h2>数据文件格式</h2>
+    <pre class="code"><span class="c"># 任意标题（说明用，解析器忽略）</span>
+
+<span class="k">## [system]</span> 我的常驻规则
+order: 40
+
+这段会追加进系统提示词，每轮生效。
+
+<span class="k">## [context]</span> 项目背景
+kind: gw-project
+trigger: 项目,需求
+
+当消息里出现「项目」或「需求」时，这段作为一条 user 消息注入会话。</pre>
+    <ul class="tight">
+      <li>块头 <code>## [system] 名称</code> / <code>## [context] 名称</code>，大小写不敏感</li>
+      <li>元数据只认 <code>order</code> / <code>kind</code> / <code>trigger</code> / <code>enabled</code>，<b>英文冒号</b>，必须紧跟块头</li>
+      <li>一旦出现非元数据非空行，后面全是正文 —— 所以正文里的「中文：」不会被误解析（这点设计得挺好）</li>
+      <li><code>enabled: false</code> 临时禁用；<code>trigger</code> 留空 = 每轮注入</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ══════════════════ 02 问题 ══════════════════ -->
+<section data-pane>
+  <div class="wrap">
+    <h2>问题诊断</h2>
+    <p class="muted">下面每条都对着源码 / 官方 <code>typert</code> 类型声明核过，不是凭感觉。点卡片展开证据。</p>
+    <div class="grid g2" id="issueGrid"></div>
+
+    <h2>严重性排序（我的判断）</h2>
+    <div class="card">
+      <ul class="tight">
+        <li><span class="tag bad">P0</span> <b>注入的 user 消息 source 不合法</b> —— 游离 kind 会污染会话派生与前端渲染，属于「协议层错误」，必须改</li>
+        <li><span class="tag bad">P0</span> <b>没有预览</b> —— 「模型到底看到了什么」看不见，这是「不太好用」的第一感受来源</li>
+        <li><span class="tag warn">P1</span> <b>去重语义错</b> —— 只在本轮 messages 里找 kind，跨轮必然重复注入</li>
+        <li><span class="tag warn">P1</span> <b>system 段硬套 <code>----</code> 分隔线</b> —— 装饰符号进提示词，模型会看到莫名横线</li>
+        <li><span class="tag warn">P1</span> <b>fs.watch 盯单个文件</b> —— 编辑器保存（替换文件）后监听会失效，热加载静默失灵</li>
+        <li><span class="tag">P2</span> config 无 schema 校验；save 不做结构校验；历史无 diff；UI 无排序/无 order 可视化/无变量支持</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 03 原型 ══════════════════ -->
+<section data-pane>
+  <div class="wrap">
+    <h2>我推测你想要的效果</h2>
+    <p>
+      核心诉求应该是：<b>「我写的东西，到底以什么形态、在什么时机进了模型的上下文」要一眼看见、随手能改、改完立刻生效</b>。
+      所以 v2 把它做成一个<b>注入工作台</b>：左边是块清单、中间是编辑器、右边是"模型视角"的实时预览 ——
+      预览里能直接看到你的段落在整条系统提示词里的<b>位置</b>，以及会合成出什么样的 user 消息。
+    </p>
+    <p class="muted">下面这个原型是可以真的点的：改文字、切启停、调 order、换模拟输入，右侧和 <code>inject.md</code> 预览都会实时跟着变。</p>
+
+    <div class="proto">
+      <div class="bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span style="flex:1">设置 › 文字注入　·　v2 原型</span>
+        <span class="badge" id="protoFile">~/.dsh/text-inject/inject.md</span>
+      </div>
+      <div class="body">
+        <!-- 左：块清单 -->
+        <div class="col">
+          <div class="colhd"><span>分区导航（左侧栏）</span></div>
+          <div class="colbd" style="max-height:120px;border-bottom:1px solid var(--line)">
+            <div class="navitem ghost"><span class="ic" style="background:#4a5570"></span>通用</div>
+            <div class="navitem on"><span class="ic"></span>文字注入</div>
+            <div class="navitem ghost"><span class="ic" style="background:#4a5570"></span>模型</div>
+            <div class="navitem ghost"><span class="ic" style="background:#4a5570"></span>插件</div>
+          </div>
+          <div class="colhd"><span>注入块 · <span id="blkCount">0</span></span><span class="mono" style="font-size:10.5px">拖动排序</span></div>
+          <div class="colbd">
+            <div class="addbar">
+              <button class="btn pri" id="addSys">+ 系统提示词</button>
+              <button class="btn" id="addCtx">+ 上下文</button>
+            </div>
+            <div id="blkList"></div>
+          </div>
+        </div>
+
+        <!-- 中：编辑器 -->
+        <div class="col">
+          <div class="colhd"><span>编辑器</span><span class="mono" style="font-size:10.5px" id="editorStat">—</span></div>
+          <div class="colbd" id="editor"></div>
+          <div class="colhd" style="border-top:1px solid var(--line);border-bottom:0"><span>inject.md 预览（保存后写回文件）</span></div>
+          <div class="colbd" style="max-height:230px;padding-top:0">
+            <div class="prev" id="mdPreview"></div>
+          </div>
+        </div>
+
+        <!-- 右：模型视角 -->
+        <div class="col">
+          <div class="colhd"><span>模型视角预览</span></div>
+          <div class="colbd">
+            <label class="f">模拟一条用户输入（用于 context 块 trigger 匹配）</label>
+            <input class="f" id="simMsg" value="帮我看下这个项目的需求，顺便改改代码" />
+            <div class="segbar" style="margin-top:11px">
+              <button class="on" data-view="sys">系统提示词装配</button>
+              <button data-view="ctx">本轮注入的消息</button>
+            </div>
+            <div id="viewSys">
+              <div class="kv"><span>段来源</span><b>ctx.systemPrompt.assemble()</b></div>
+              <div class="kv"><span>排序</span><b>order 升序 → 同 order 比 name</b></div>
+              <div class="kv"><span>拼接</span><b>空段过滤后 "\n\n" join</b></div>
+              <div class="prev" id="sysPreview" style="margin-top:9px;max-height:330px"></div>
+            </div>
+            <div id="viewCtx" style="display:none">
+              <div class="kv"><span>时机</span><b>agent/pre-step（prepend）</b></div>
+              <div class="kv"><span>形态</span><b>createUserMessage()</b></div>
+              <div class="kv"><span>去重</span><b>source.plugin + sections.name</b></div>
+              <div class="prev" id="ctxPreview" style="margin-top:9px;max-height:330px"></div>
+            </div>
+            <div id="validBox" style="margin-top:12px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h2>相对 v1 的新增点</h2>
+    <div class="grid g3">
+      <div class="card"><h3>🔍 真实预览</h3><p>host 侧新增 <code>/preview</code>，直接调用 <code>systemPrompt.assemble()</code> 拿到装配后的段列表，标出哪几段是你注入的、落在哪个 order 区间。</p></div>
+      <div class="card"><h3>🧩 变量支持</h3><p>复用框架已有变量 <code>{{provider}}</code> <code>{{model}}</code> <code>{{cwd}}</code>，编辑器里给出可用清单和未注册变量的红字提示。</p></div>
+      <div class="card"><h3>🎚 order 可视化</h3><p>把官方段序列（-1000 … 9900）画成一条轴，你的段直接落在轴上，不再靠猜「40 是插在哪」。</p></div>
+      <div class="card"><h3>🕓 带 diff 的历史</h3><p>备份列表可预览、可 diff、可命名；恢复前先预演「恢复后会变成什么样」。</p></div>
+      <div class="card"><h3>✅ 实时校验</h3><p>kind 唯一 / 名称不重复 / order 合法 / 变量已注册 / 正文非空 —— 边写边报，不等保存。</p></div>
+      <div class="card"><h3>📥 导入导出</h3><p>整份配置导出 <code>.md</code>；从粘贴的 markdown 导入。配合独立文件，换机搬配置一步到位。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 04 技术方案 ══════════════════ -->
+<section data-pane>
+  <div class="wrap">
+    <h2>改动清单</h2>
+    <div class="grid g2">
+      <div class="card">
+        <h3>host 半（lib/index.js）</h3>
+        <ul class="tight">
+          <li><b>Config 走 Schemastery</b>：<code>file</code> / <code>watch</code> / <code>maxHistory</code>，非法配置在加载时报错而不是静默忽略</li>
+          <li><b>修正 source 形态</b>：改为官方 ContextFormed 里的 <code>{kind:'plugin', plugin:name, form:'snapshot', sections:[…]}</code></li>
+          <li><b>去重改为投影式</b>：用 <code>sessionProjections.register()</code> 记录「本会话已注入过哪些块」，跨轮真去重</li>
+          <li><b>system 段去掉装饰线</b>：<code>text</code> 就是原文，分隔交给框架的 <code>"\n\n"</code> join</li>
+          <li><b>watch 目录而非文件</b>：避免编辑器「替换文件」后监听失效</li>
+          <li><b>新增路由</b>：<code>GET /preview</code>（真实装配）、<code>POST /validate</code>、<code>GET /variables</code></li>
+          <li><b>save 做结构校验</b>：块必须过一遍 schema 再落盘，坏数据不进文件</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>client 半（lib/client.js）</h3>
+        <ul class="tight">
+          <li>三栏布局：块清单 / 编辑器 / 模型视角预览</li>
+          <li>块拖动排序、悬停快捷启停、类型切换</li>
+          <li>order 轴可视化（叠官方段序列）</li>
+          <li>报错上浮到界面（不再只写 console）</li>
+          <li>历史 diff 视图 + 恢复预演</li>
+          <li>locale 词典补全新键（zh/en 必须齐全，否则 <code>ctx.locale.register</code> 抛错）</li>
+          <li>保留：<code>settings.section</code> 注册范式、同源 fetch、无 CORS、不额外占端口</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>关键改动：注入消息的 source</h2>
+    <p class="muted">
+      官方 <code>dsh-llm</code> 的 <code>MessageSourceMap</code> 里并没有「随便一个 kind」这回事；
+      <code>kind:'plugin'</code> 才需要 <code>plugin</code> 字段，而带语义的形态走 <code>form</code>。
+      官方 <code>dsh-time-context</code> 就是标准范例。
+    </p>
+    <pre class="code"><span class="c">// v1 —— lib/index.js（现状：游离 kind，语义不明）</span>
+injected.push({
+  id: randomUUID(),
+  role: <span class="s">"user"</span>,
+  content: [{ type: <span class="s">"text"</span>, text: b.body }],
+  source: { kind: <span class="bad">b.kind</span> },        <span class="c">// ← 'gw-project' 不在 MessageSourceMap 里</span>
+});
+
+<span class="c">// v2 —— 对齐官方形态（dsh-time-context 同款）</span>
+createUserMessage({
+  content: [{ type: <span class="s">"text"</span>, text: body }],
+  source: {
+    kind: <span class="good">"plugin"</span>,
+    plugin: name,                       <span class="c">// '@gw/dsh-text-inject'</span>
+    form: <span class="good">"snapshot"</span>,
+    sections: [{ name: <span class="s">`gw-text-inject:${b.name}`</span>, text: body }],
+  },
+});</pre>
+
+    <h2>关键改动：系统段文本</h2>
+    <pre class="code"><span class="c">// v1</span>
+text: <span class="s">`\n\n${"-".repeat(32)}\n${b.body}\n${"-".repeat(32)}`</span>
+<span class="c">//   ↑ 32 个短横线会原样进提示词，模型看到莫名其妙的分隔符</span>
+
+<span class="c">// v2 —— 原文即文本，框架自己会用 "\n\n" 把段拼起来</span>
+ctx.systemPrompt.section({ name: <span class="s">`gw-text-inject:${b.name}`</span>, order, text: b.body });</pre>
+
+    <h2>验证方式（不猜，跑出来）</h2>
+    <pre class="code"><span class="c"># 1. 装配结果离线看：dsh 会打印完整配置树，能看到你的 insert 行生效</span>
+dsh --profile web --dump-config
+
+<span class="c"># 2. 装到独立 profile 里练，不污染日常 profile</span>
+dsh plugin --profile plugin-dev add ./dsh-text-inject
+dsh --profile plugin-dev
+
+<span class="c"># 3. 本地临时叠加层（name 必须绝对路径，相对路径会静默失败）</span>
+dsh web --patch ./scratch/cordis.yml</pre>
+    <div class="card" style="margin-top:12px">
+      <h3>已实测的环境事实</h3>
+      <ul class="tight">
+        <li>web profile 的 <code>cordis.patch.yml</code> 里 <code>gw-text-inject</code> insert 行已存在，<code>--dump-config</code> 能打印出来（配置层没问题）</li>
+        <li>同一份 patch 里 <code>font</code> / <code>modlens</code> 两行会报 <code>patch: entry not found</code>（本就 <code>disabled</code>，不影响启动）</li>
+        <li>官方段 order 常量：<code>harness:identity -1000</code> / <code>deployment:persona 0</code> / <code>PLAN_POLICY 500</code> / 工具段 1000–2900 / <code>TOOLS_SDK 5000</code> / <code>STRUCTURED_OUTPUT 9900</code></li>
+        <li>段名重复在同层会直接抛错，所以 <code>gw-text-inject:&lt;名称&gt;</code> 这个命名前缀要保住</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<script>
+/* ────────────── 数据：现状卡片 ────────────── */
+const FEATS = [
+  { t:"提示词注入", tag:["sys","system"], d:"`## [system] 名称` 块 → 追加进系统提示词，每轮生效。实现：`ctx.systemPrompt.section({name, order, text})`，disposer 收集起来统一清理。",
+    more:"注册名带命名空间前缀 `gw-text-inject:<名称>`，避免和官方段（`harness:identity`、`deployment:persona`…）撞名。同层同名会直接抛错，这是框架的保护。" },
+  { t:"上下文注入", tag:["ctx","context"], d:"`## [context] 名称` 块 → 在 `agent/pre-step` 里合成一条 user 消息。以 `source.kind` 去重、`trigger` 关键词门控、没写 kind 直接跳过。",
+    more:"监听器用 `{prepend:true}` 注册，先 `await next()` 拿到别的插件处理完的 decision，再往 `messages` 尾巴上追加。" },
+  { t:"独立文件 + 热加载", tag:["ok","hot"], d:"全部内容写在 `~/.dsh/text-inject/inject.md`（`config.file` 可改）。`fs.watch` + 120ms 防抖，保存即生效，不用重启 dsh。",
+    more:"首次加载时会把包内 `inject.md` 种子模板复制成用户数据文件。`fs.watch` 在这个文件被「替换式保存」时会失效 —— 列进问题清单了。" },
+  { t:"设置页 UI", tag:["ok","web"], d:"往官方设置页注册 `settings.section`（id `gw-text-inject`，order 60）。块卡片列表 + 新增/编辑/删除/启停 + kind 重复告警 + 历史备份查看/恢复。",
+    more:"client 半是 lazy-CJS bundle（`window.__ModuleLoader__.load`），`require(\"react\")` 取平台实例。react/slots/locale 任一缺失就整段跳过，不拖累 dsh 其它部分。" },
+  { t:"同源数据通道", tag:["ok","http"], d:"前端无本地文件桥，读写走 host 的 webServer 前缀路由：`GET /state`、`GET /raw?name=`、`POST /save`、`POST /restore`。无 CORS、不额外占端口。",
+    more:"`ctx.webServer.register({kind:'prefix', path:'/gw-text-inject', handler})`。官方匹配顺序：先精确路由，再最长前缀，最后 fallback。" },
+  { t:"历史备份", tag:["ok","disk"], d:"每次保存先把上一版写进 `history/inject-<YYYYMMDD-HHMMSS>.md`，最多保留 30 份，超出按名字顺序删最旧。",
+    more:"备份名带时间戳、可排序；但列表只是堆叠，没有 diff、不能命名、恢复是直接覆盖。" },
+];
+
+const ISSUES = [
+  { t:"注入的消息 source 不在官方枚举里", sev:"bad", tag:"协议层",
+    d:"v1 直接 `source:{kind:'gw-project'}`，但 `dsh-llm` 的 MessageSourceMap 里没有这种 kind。",
+    more:`<pre class="code">// dsh-llm typert.host.js —— MessageSourceMap 的真实形状
+type ContextFormed =
+  | { form?: never }
+  | { form: 'instructions' } | { form: 'catalog' }
+  | { form: 'snapshot'; sections: ContextSnapshotSection[] }
+  | { form: 'notice'; summary: string }
+  | { form: 'relay' } | { form: 'recall' };
+
+// plugin 来源必须自带 plugin 字段
+{ kind: 'plugin'; plugin: string } & ContextFormed
+
+// 官方 dsh-time-context 的写法（照抄这个就对）
+source: { kind:'plugin', plugin:name, form:'snapshot', sections:[{name,text}] }</pre>` },
+  { t:"去重逻辑跨轮必然失效", sev:"bad", tag:"逻辑",
+    d:"`kinds` 是从本轮 `decision.messages` 里扫出来的，而这批 messages 是「本轮新消息」，不是会话历史。",
+    more:`<pre class="code">const msgs = decision.messages;              <span class="c">// ← 只是本轮</span>
+const kinds = new Set(msgs.map(m => m.source.kind));
+if (kinds.has(b.kind)) continue;             <span class="c">// ← 跨轮永远 has 不到</span></pre>
+<p class="muted">结果：只要 trigger 命中，同一块会在每一轮重复注一条 user 消息，token 一直涨。正确做法是用 <code>sessionProjections.register()</code>（官方 time-context / agent-instructions 都这么干）记录「本会话已注入过什么」。</p>` },
+  { t:"system 段硬套 32 个短横线", sev:"warn", tag:"提示词污染",
+    d:"注册时 text 是 `\\n\\n` + 32 个 `-` + 正文 + 32 个 `-`，装饰符原样进提示词。",
+    more:`<pre class="code">text: <span class="s">\`\\n\\n\${"-".repeat(32)}\\n\${b.body}\\n\${"-".repeat(32)}\`</span>
+
+<span class="c"># 模型看到的是：</span>
+You are an AI agent powered by DeepSeek Harness.
+
+--------------------------------
+我的常驻规则正文
+--------------------------------
+
+Current runtime context. …</pre>
+<p class="muted">框架拼接段本来就用 <code>"\\n\\n"</code> join（<code>renderPrompt</code>），分隔线纯属自找。</p>` },
+  { t:"fs.watch 盯的是单个文件", sev:"warn", tag:"可靠性",
+    d:"很多编辑器保存是「写临时文件 → 替换」；文件被替换后，原先的 watch 句柄在 Windows 上就不再触发。",
+    more:`<pre class="code">watcher = fs.watch(dataFile, () => { /* … */ });   <span class="c">// 文件被 replace 后静默失效</span>
+
+<span class="c">// 改法：盯目录，过滤目标文件名</span>
+fs.watch(path.dirname(dataFile), (ev, fn) => { if (fn === path.basename(dataFile)) scheduleReload(); });</pre>` },
+  { t:"config 没有 schema", sev:"", tag:"健壮性",
+    d:"`apply(ctx, config)` 里只做 `config.file ? path.resolve(...) : 默认`。传了数字、空串、非法路径都不报错。",
+    more:"官方约定：可能因部署而不同的参数必须是 config 字段，非法配置应当在加载时就大声报错。加个 `Schema.object({ file: Schema.string(), watch: Schema.boolean().default(true) })` 就解决。" },
+  { t:"save 不校验块结构", sev:"", tag:"数据安全",
+    d:"`POST /save` 把 body 里的 `blocks` 数组直接交给 `serializeBlocks` 落盘，畸形块会被写成半截 markdown 进数据文件。",
+    more:"后果是解析器下次读回来时把坏行当正文，用户看到「我写的东西被吞了」。落盘前过一遍 schema 就行。" },
+  { t:"没有预览", sev:"bad", tag:"体验",
+    d:"整份 UI 都在「写」，没有一个地方告诉你「写完后模型看到了什么」。",
+    more:"这是「不太好用」的第一感受来源。host 侧已经能 `ctx.systemPrompt.assemble()` 拿到真实装配结果，把它暴露成只读路由，前端标出「哪几段是你的、落在哪个 order 区间」即可。" },
+  { t:"order 是个裸数字", sev:"", tag:"体验",
+    d:"用户要填 `order: 40`，但没人知道官方段序列长什么样，也没人知道 40 落在哪。",
+    more:"官方段 order 是公开常量表：`harness:identity -1000`、`deployment:persona 0`、`PLAN_POLICY 500`、工具段 1000–2900、`TOOLS_SDK 5000`、`STRUCTURED_OUTPUT 9900`。画成一条轴就懂了。" },
+  { t:"历史只有堆叠，没有 diff", sev:"", tag:"体验",
+    d:"备份列表能看能恢复，但不能比、不能命名，恢复是「看不见后果的直接覆盖」。",
+    more:"建议：列表 + 选中预览 + 与当前版本行级 diff + 恢复前预演。" },
+];
+
+/* ────────────── 渲染：现状 ────────────── */
+const featGrid = document.getElementById('featGrid');
+FEATS.forEach(f=>{
+  const el=document.createElement('div'); el.className='card click';
+  el.innerHTML = `<h3>${f.t} <span class="tag ${f.tag[0]}">${f.tag[1]}</span></h3>
+    <p>${f.d.replace(/`([^`]+)`/g,'<code>$1</code>')}</p>
+    <div class="more">${f.more.replace(/`([^`]+)`/g,'<code>$1</code>')}</div>`;
+  el.onclick=()=>el.classList.toggle('open');
+  featGrid.appendChild(el);
+});
+
+/* ────────────── 渲染：问题 ────────────── */
+const issueGrid = document.getElementById('issueGrid');
+ISSUES.forEach(x=>{
+  const el=document.createElement('div'); el.className='card click';
+  el.innerHTML = `<h3>${x.t} ${x.sev?`<span class="tag ${x.sev}">重点</span>`:''}<span class="tag">${x.tag}</span></h3>
+    <p>${x.d.replace(/`([^`]+)`/g,'<code>$1</code>')}</p>
+    <div class="more">${x.more}</div>`;
+  el.onclick=()=>el.classList.toggle('open');
+  issueGrid.appendChild(el);
+});
+
+/* ────────────── tabs ────────────── */
+const panes=[...document.querySelectorAll('section[data-pane]')];
+const HASHES=['now','issues','proto','plan'];
+function goTab(i,silent){
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.remove('on'));
+  const btn=document.querySelector(`#tabs button[data-go="${i}"]`);
+  if(btn) btn.classList.add('on');
+  panes.forEach((p,k)=>p.classList.toggle('on', k===i));
+  if(!silent) window.scrollTo({top:0,behavior:'smooth'});
+  try{ history.replaceState(null,'','#'+HASHES[i]); }catch(e){}
+}
+document.querySelectorAll('#tabs button').forEach(b=>{ b.onclick=()=>goTab(+b.dataset.go); });
+(function initHash(){
+  const h=(location.hash||'').replace('#','');
+  const i=HASHES.indexOf(h);
+  if(i>0) goTab(i,true);
+})();
+
+/* ══════════════ 原型：状态机 ══════════════ */
+const OFFICIAL = [
+  { name:'harness:identity',  order:-1000, text:'You are an AI agent powered by DeepSeek Harness.' },
+  { name:'harness:source',    order:-900,  text:'(运行环境与来源信息…)' },
+  { name:'deployment:persona',order:0,     text:'(persona：默认空)' },
+  { name:'plan-policy',       order:500,   text:'(计划模式策略…)' },
+  { name:'tools:write',       order:1200,  text:'(write 工具用法…)' },
+  { name:'tools:edit',        order:1300,  text:'(edit 工具用法…)' },
+  { name:'tools:web-search',  order:2000,  text:'(web_search 工具用法…)' },
+  { name:'tools:sdk',         order:5000,  text:'(工具 SDK 说明…)' },
+  { name:'structured-output', order:9900,  text:'(结构化输出规范…)' },
+];
+
+let uid = 1;
+const mk = (o)=>Object.assign({ id:uid++, type:'system', name:'', order:40, kind:'', trigger:'', enabled:true, body:'' }, o);
+
+const S = { blocks:[
+  mk({ type:'system', name:'常驻规则', order:40, body:'回答用中文。不确定的地方先问我，别自己瞎猜。' }),
+  mk({ type:'context', name:'项目背景', order:40, kind:'gw-project', trigger:'项目,需求', body:'当前在做 dsh 文字注入插件，仓库在 Z:\\dsh\\@gw\\dsh-text-inject。' }),
+  mk({ type:'context', name:'禁用示例', order:40, kind:'gw-demo', trigger:'', enabled:false, body:'这块被关掉了，不会注入。' }),
+], sel:1, view:'sys' };
+
+const $ = (id)=>document.getElementById(id);
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* 校验 */
+function validate(){
+  const errs=[], warns=[];
+  const names=new Set(), kinds=new Set();
+  S.blocks.forEach(b=>{
+    if(!b.name.trim()) errs.push(`有一个块没填名称`);
+    if(names.has(b.name) && b.name.trim()) errs.push(`块名重复：${b.name}`);
+    names.add(b.name);
+    if(!Number.isFinite(b.order)) errs.push(`${b.name}：order 必须是数字`);
+    if(b.type==='system' && !b.body.trim()) warns.push(`${b.name}：正文是空的，注入了等于没注`);
+    if(b.type==='context'){
+      if(!b.kind.trim()) errs.push(`${b.name}：上下文块必须有 kind（用于去重）`);
+      else if(kinds.has(b.kind)) errs.push(`kind 重复：${b.kind}（去重会误伤）`);
+      kinds.add(b.kind);
+      if(!b.body.trim()) warns.push(`${b.name}：正文是空的`);
+      if(!b.trigger.trim()) warns.push(`${b.name}：没写 trigger，等于每轮都注入`);
+    }
+    const vs=[...b.body.matchAll(/\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g)].map(m=>m[1]);
+    vs.forEach(v=>{ if(!['provider','model','cwd'].includes(v)) errs.push(`${b.name}：变量 {{${v}}} 未注册（可用：provider / model / cwd）`); });
+  });
+  return { errs, warns };
+}
+
+/* 渲染块清单 */
+function renderList(){
+  const box=$('blkList'); box.innerHTML='';
+  S.blocks.forEach((b,i)=>{
+    const el=document.createElement('div');
+    el.className='blk'+(i===S.sel?' sel':'')+(b.enabled?'':' off');
+    el.innerHTML=`<div class="r1">
+        <span class="tag ${b.type==='system'?'sys':'ctx'}">${b.type==='system'?'SYSTEM':'CTX'}</span>
+        <span class="nm">${esc(b.name||'(未命名)')}</span>
+        <span class="sw ${b.enabled?'on':''}" data-sw="${i}" title="启停"></span>
+      </div>
+      <div class="r2">
+        <span>order ${b.order}</span>
+        ${b.type==='context'?`<span>kind ${esc(b.kind||'—')}</span>`:''}
+        ${b.type==='context'?`<span>${b.trigger?esc(b.trigger):'每轮'}</span>`:''}
+      </div>`;
+    el.onclick=(ev)=>{
+      if(ev.target.dataset.sw!==undefined){ b.enabled=!b.enabled; renderAll(); return; }
+      S.sel=i; renderAll();
+    };
+    box.appendChild(el);
+  });
+  $('blkCount').textContent=S.blocks.length;
+}
+
+/* 渲染编辑器 */
+function renderEditor(){
+  const box=$('editor'); const b=S.blocks[S.sel];
+  if(!b){ box.innerHTML='<p class="muted" style="font-size:12.5px">左边选一个块来编辑。</p>'; $('editorStat').textContent='—'; return; }
+  $('editorStat').textContent=`${b.type} · order ${b.order} · ${b.body.length} 字`;
+  box.innerHTML=`
+    <div class="inline">
+      <div>
+        <label class="f">名称</label>
+        <input class="f" id="fName" value="${esc(b.name)}" />
+      </div>
+      <div>
+        <label class="f">类型</label>
+        <select class="f" id="fType">
+          <option value="system"${b.type==='system'?' selected':''}>系统提示词（每轮生效）</option>
+          <option value="context"${b.type==='context'?' selected':''}>上下文（条件注入）</option>
+        </select>
+      </div>
+    </div>
+    <div class="inline">
+      <div>
+        <label class="f">order（越小越靠前）</label>
+        <input class="f" id="fOrder" type="number" value="${b.order}" />
+      </div>
+      <div>
+        <label class="f">启用</label>
+        <select class="f" id="fEnabled">
+          <option value="1"${b.enabled?' selected':''}>启用</option>
+          <option value="0"${b.enabled?'':' selected'}>禁用</option>
+        </select>
+      </div>
+    </div>
+    ${b.type==='context'?`
+    <div class="inline">
+      <div>
+        <label class="f">kind（去重键，唯一）</label>
+        <input class="f" id="fKind" value="${esc(b.kind)}" />
+      </div>
+      <div>
+        <label class="f">trigger（逗号分隔，空=每轮）</label>
+        <input class="f" id="fTrigger" value="${esc(b.trigger)}" />
+      </div>
+    </div>`:''}
+    <label class="f">正文　<span style="color:#6b7688">可用变量：{{provider}} {{model}} {{cwd}}</span></label>
+    <textarea class="f" id="fBody">${esc(b.body)}</textarea>
+    <div style="display:flex;gap:7px;margin-top:9px">
+      <button class="btn" id="dupBlk">复制</button>
+      <button class="btn danger" id="delBlk">删除</button>
+      <span style="flex:1"></span>
+      <button class="btn pri" id="saveBlk">保存并热加载</button>
+    </div>
+    <div id="saveMsg" class="hint"></div>
+    <div id="orderAxis" style="margin-top:14px"></div>`;
+
+  const bind=(id,key,cast)=>{
+    const el=$(id); if(!el) return;
+    el.oninput=el.onchange=()=>{ b[key]=cast?cast(el.value):el.value; renderAll(true); };
+  };
+  bind('fName','name'); bind('fType','type');
+  bind('fOrder','order',v=>Number(v)); bind('fEnabled','enabled',v=>v==='1');
+  bind('fKind','kind'); bind('fTrigger','trigger'); bind('fBody','body');
+
+  $('dupBlk').onclick=()=>{ S.blocks.splice(S.sel+1,0,mk(Object.assign({},b,{id:uid++,name:b.name+'-副本'}))); S.sel++; renderAll(); };
+  $('delBlk').onclick=()=>{ S.blocks.splice(S.sel,1); S.sel=Math.max(0,S.sel-1); renderAll(); };
+  $('saveBlk').onclick=()=>{ const m=$('saveMsg'); m.textContent='已保存 · 已热加载 · 已备份上一版到 history/'; setTimeout(()=>m.textContent='',2600); };
+
+  renderAxis(b);
+}
+
+/* order 轴 */
+function renderAxis(cur){
+  const all=[...OFFICIAL.map(o=>({name:o.name,order:o.order,mine:false})),
+             ...S.blocks.filter(b=>b.type==='system'&&b.enabled).map(b=>({name:b.name,order:b.order,mine:true}))]
+             .sort((a,b)=>a.order-b.order);
+  const lo=-1200, hi=10200;
+  const pos=v=>((v-lo)/(hi-lo))*100;
+  let ticks='';
+  all.forEach(n=>{ ticks+=`<div title="${esc(n.name)} @ ${n.order}" style="position:absolute;left:${pos(n.order)}%;transform:translateX(-50%);top:${n.mine?'0':'12px'};width:2px;height:9px;background:${n.mine?'#7c9cff':'#2f3a4e'}"></div>`; });
+  const mine=all.filter(n=>n.mine).map(n=>`<span style="position:absolute;left:${pos(n.order)}%;transform:translateX(-50%);top:22px;font-size:10px;color:#9db4ff;white-space:nowrap">${esc(n.name)}</span>`).join('');
+  $('orderAxis').innerHTML=`
+    <label class="f">order 轴（蓝线=你的段，灰线=官方段序列）</label>
+    <div style="position:relative;height:52px;background:#0c1118;border:1px solid var(--line);border-radius:8px;padding:0 8px;overflow:hidden">
+      <div style="position:absolute;left:8px;right:8px;top:9px;height:1px;background:#232c3c"></div>
+      ${ticks}${mine}
+    </div>
+    <div class="hint">官方关键档：identity −1000 / persona 0 / plan 500 / 工具 1000–2900 / SDK 5000 / structured 9900</div>`;
+}
+
+/* 系统提示词装配预览 */
+function renderSys(){
+  const mine=S.blocks.filter(b=>b.type==='system'&&b.enabled&&b.body.trim())
+    .map(b=>({name:`gw-text-inject:${b.name}`,order:b.order,text:b.body,mine:true}));
+  const all=[...OFFICIAL.map(o=>Object.assign({},o,{mine:false})),...mine].sort((a,b)=>a.order-b.order||String(a.name).localeCompare(String(b.name)));
+  let html='';
+  all.forEach(s=>{
+    const body=s.mine?s.text:'…';
+    html+=`<span class="${s.mine?'mine':'offi'}"><span class="ln">[${String(s.order).padStart(5)}]</span> ${esc(s.name)}${s.mine?'  ← 你注入的':''}\n${esc(body)}</span>`;
+  });
+  html+=`\n<span class="offi"><span class="ln">[  ∞]</span> … 其余官方段继续按 order 升序往下拼</span>`;
+  $('sysPreview').innerHTML=html;
+}
+
+/* 上下文注入预览 */
+function renderCtx(){
+  const q=$('simMsg').value||'';
+  const hits=[];
+  S.blocks.filter(b=>b.type==='context'&&b.enabled&&b.body.trim()).forEach(b=>{
+    const tr=b.trigger.split(',').map(s=>s.trim()).filter(Boolean);
+    const triggerOK = tr.length===0 || tr.some(t=>q.includes(t));
+    if(tr.length===0) hits.push({b,why:'trigger 为空 → 每轮注入'});
+    else if(triggerOK) hits.push({b,why:`命中关键词：${tr.filter(t=>q.includes(t)).join(' / ')}`});
+  });
+  const obj={
+    role:'user',
+    content:[{type:'text',text:'<注入正文>'}],
+    source:{kind:'plugin',plugin:'@gw/dsh-text-inject',form:'snapshot',sections:hits.map(h=>({name:`gw-text-inject:${h.b.name}`,text:h.b.body.slice(0,40)+(h.b.body.length>40?'…':'')}))}
+  };
+  let html='';
+  if(!hits.length){ html='<span class="offi">本轮没有 context 块命中，不注入任何消息。</span>'; }
+  else{
+    hits.forEach(h=>{ html+=`<span class="mine">▶ ${esc(h.b.name)}　<span class="ln">// ${esc(h.why)}</span>\n${esc(h.b.body)}</span>\n`; });
+    html+=`<span class="ln">—— 实际挂进 messages 的对象形状 ——</span>\n${esc(JSON.stringify(obj,null,2))}`;
+  }
+  $('ctxPreview').innerHTML=html;
+}
+
+/* 校验面板 */
+function renderValid(){
+  const {errs,warns}=validate();
+  let html='';
+  if(errs.length) html+=`<div class="err">✕ ${errs.length} 个错误：<br>${errs.map(e=>'· '+esc(e)).join('<br>')}</div>`;
+  if(warns.length) html+=`<div class="warnline">! ${warns.length} 个提醒：<br>${warns.map(e=>'· '+esc(e)).join('<br>')}</div>`;
+  if(!errs.length&&!warns.length) html='<div class="hint" style="color:#7fe3d0">✓ 全部通过</div>';
+  $('validBox').innerHTML=html;
+}
+
+/* inject.md 预览 */
+function renderMd(){
+  const typeOrder=S.blocks.slice().sort((a,b)=>(a.type===b.type?0:a.type==='system'?-1:1));
+  let out='# @gw/dsh-text-inject — 文字注入配置\n';
+  out+='# 块头：## [system] 名称 / ## [context] 名称；元数据用英文冒号。\n\n';
+  typeOrder.forEach(b=>{
+    out+=`## [${b.type}] ${b.name||'未命名'}\n`;
+    if(b.type==='system') out+=`order: ${b.order}\n`;
+    else { out+=`kind: ${b.kind||''}\n`; if(b.trigger) out+=`trigger: ${b.trigger}\n`; }
+    if(!b.enabled) out+='enabled: false\n';
+    out+=`\n${b.body}\n\n`;
+  });
+  $('mdPreview').innerHTML=esc(out);
+}
+
+function renderAll(keepFocus){
+  const active=document.activeElement, id=active&&active.id, sels=active&&active.selectionStart;
+  renderList();
+  if(!keepFocus) renderEditor(); else { renderEditor(); }
+  if(id){ const el=$(id); if(el){ el.focus(); try{ el.setSelectionRange(sels,sels); }catch(e){} } }
+  renderSys(); renderCtx(); renderValid(); renderMd();
+}
+
+$('addSys').onclick=()=>{ S.blocks.push(mk({type:'system',name:'新系统块',order:40,body:'在这里写要常驻的规则。'})); S.sel=S.blocks.length-1; renderAll(); };
+$('addCtx').onclick=()=>{ S.blocks.push(mk({type:'context',name:'新上下文块',order:40,kind:'gw-'+uid,trigger:'',body:'命中关键词时注入的上下文。'})); S.sel=S.blocks.length-1; renderAll(); };
+$('simMsg').oninput=()=>{ renderCtx(); };
+document.querySelectorAll('.segbar [data-view]').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('.segbar [data-view]').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); S.view=b.dataset.view;
+    $('viewSys').style.display=S.view==='sys'?'':'none';
+    $('viewCtx').style.display=S.view==='ctx'?'':'none';
+  };
+});
+
+renderAll();
+</script>
+</body>
+</html>
