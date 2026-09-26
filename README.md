@@ -1,5 +1,9 @@
 # @gw/dsh-text-inject
 
+[![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+[![dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-4b8bbe?logo=github)](https://github.com/topics/dsh-plugin)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+
 在 dsh（DeepSeek Harness）**官方设置页左侧栏**添加一个「**文字注入**」分区：把文字注入到
 **系统提示词**（每轮生效）或**会话上下文**；内容存于**独立文件**，支持**热加载**与**历史备份**。
 
@@ -86,7 +90,8 @@ trigger: 项目,需求
 - host 半依赖服务：`systemPrompt`（`@deepseek-ai/dsh-base` 提供）、`webServer`（`@deepseek-ai/dsh-host-webserver` 提供）。
 - client 半依赖服务：`slots`、`locale`；`dsh.client.inject` 声明 `@deepseek-ai/dsh-client-locale`、`@deepseek-ai/dsh-client-ui-settings`。
 - `dsh.client.platform = "web"`；`exports` 含 `"."` 与 `"./client"`。
-- 兼容 dsh release：`0.1.2-rc.1` / `0.1.5-rc.1` / `0.1.5-rc.2`。
+- 兼容 dsh release：`0.1.2-rc.1` / `0.1.5-rc.1` / `0.1.5-rc.2`（最后验证 2026-09-26）。
+- 官方 `@deepseek-ai/*` 包未列入 `dependencies`，由宿主 profile 提供。
 
 ## 卸载
 
@@ -94,6 +99,29 @@ trigger: 项目,需求
 2. 删除 `node_modules/@gw/dsh-text-inject/`。
 3. 数据文件 `~/.dsh/text-inject/`（含 `history/`）可按需保留或删除。
 4. 重启 dsh。
+
+## 权限与数据
+
+- 读写的只有一份文件：默认 `~/.dsh/text-inject/inject.md` 及其 `history/` 备份（可在 loader 配置里改到任意路径）。
+- 不访问网络、不读凭据、不上报任何数据。
+- 前端与 host 之间走 dsh 自己的 webServer **同源**路由（`/gw-text-inject/*`），不额外开端口、无跨域。
+- 注入的内容会进入每一轮请求，等于放大提示词体积——`[context]` 块建议配 `trigger`，别全量常驻，否则白白烧 token。
+
+## 常见问题
+
+| 现象 | 原因 / 处理 |
+|---|---|
+| 设置页左侧栏没有「文字注入」 | 包没进 `node_modules`，或 `cordis.patch.yml` 的 insert 块用了 `file://` 路径。带 `dsh.client` 的插件**必须**真装进 node_modules，绝对路径挂载会让整站前端 bundle 连坐失败 |
+| 改了文件没生效 | 热加载靠 `fs.watch`；部分编辑器「原子保存」会丢事件，去设置页点一次保存即可 |
+| 上下文块一直重复注入 | `[context]` 块缺 `kind`（去重键），或 `trigger` 太宽泛 |
+| 元数据行没被识别 | 必须用**英文冒号**，且要紧跟块头、在正文之前 |
+| 整站前端报 `Failed to load plugins` | 见第一条：摘掉本插件的 insert 块并重启，前端即恢复 |
+
+回滚：按「卸载」四步走，数据文件可保留。插件自身不落盘日志，排障看 dsh 启动日志。
+
+## 许可证与安全
+
+MIT，见 [LICENSE](./LICENSE)。本插件不接触密钥、不产生外发流量，安全问题直接在仓库提 issue。
 
 ## 结构
 

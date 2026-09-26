@@ -3,6 +3,15 @@
   "version": "1.0.0",
   "description": "在 dsh 官方设置页左侧栏添加「文字注入」：把文字注入系统提示词或会话上下文，内容存于独立文件，支持热加载与历史备份。Text injection into the system prompt or session context from a DSH Settings page, persisted in a standalone file with hot-reload and history.",
   "license": "MIT",
+  "author": "gw",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/1497105876/dsh-text-inject.git"
+  },
+  "homepage": "https://github.com/1497105876/dsh-text-inject#readme",
+  "bugs": {
+    "url": "https://github.com/1497105876/dsh-text-inject/issues"
+  },
   "type": "module",
   "main": "lib/index.js",
   "exports": {
