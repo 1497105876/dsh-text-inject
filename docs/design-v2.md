@@ -1,6 +1,6 @@
 # @gw/dsh-text-inject v2 设计方案
 
-> 对象：`Z:\dsh\@gw\dsh-text-inject`（web profile）
+> 对象：本仓库 `dsh-text-inject`（web profile）
 > 日期：2026-09-23
 > 依据：本机 `node_modules/@deepseek-ai/*` 真实源码 + 189 个真实会话日志 + 插件实机复现
 

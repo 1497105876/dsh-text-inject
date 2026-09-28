@@ -554,7 +554,7 @@ const mk = (o)=>Object.assign({ id:uid++, type:'system', name:'', order:40, kind
 
 const S = { blocks:[
   mk({ type:'system', name:'常驻规则', order:40, body:'回答用中文。不确定的地方先问我，别自己瞎猜。' }),
-  mk({ type:'context', name:'项目背景', order:40, kind:'gw-project', trigger:'项目,需求', body:'当前在做 dsh 文字注入插件，仓库在 Z:\\dsh\\@gw\\dsh-text-inject。' }),
+  mk({ type:'context', name:'项目背景', order:40, kind:'gw-project', trigger:'项目,需求', body:'当前在做 dsh 文字注入插件，仓库是 @gw/dsh-text-inject。' }),
   mk({ type:'context', name:'禁用示例', order:40, kind:'gw-demo', trigger:'', enabled:false, body:'这块被关掉了，不会注入。' }),
 ], sel:1, view:'sys' };
 
