@@ -90,8 +90,27 @@ trigger: 项目,需求
 - host 半依赖服务：`systemPrompt`（`@deepseek-ai/dsh-base` 提供）、`webServer`（`@deepseek-ai/dsh-host-webserver` 提供）。
 - client 半依赖服务：`slots`、`locale`；`dsh.client.inject` 声明 `@deepseek-ai/dsh-client-locale`、`@deepseek-ai/dsh-client-ui-settings`。
 - `dsh.client.platform = "web"`；`exports` 含 `"."` 与 `"./client"`。
-- 兼容 dsh release：`0.1.2-rc.1` / `0.1.5-rc.1` / `0.1.5-rc.2`（最后验证 2026-09-26）。
+- 兼容 dsh release：`0.1.2-rc.1` / `0.1.5-rc.1` / `0.1.5-rc.2` / `0.1.7-rc.2` / `0.2.0-rc.2`（最后验证 2026-10-01）。
 - 官方 `@deepseek-ai/*` 包未列入 `dependencies`，由宿主 profile 提供。
+
+### 按 dsh 版本选择插件版本
+
+dsh 仍处开发者预览期，破坏性变更频繁，**插件按 dsh 版本锁定**。本仓库的每个 git tag 对应一个已验证的 dsh 发行版，装之前先对上号：
+
+| 你本机的 dsh 版本 | 装这个插件 tag | 说明 |
+|---|---|---|
+| `0.1.0` – `0.1.7`（含 rc / alpha） | `dsh-0.1.x` | 旧版 dsh（2026-09 及之前验证，设置页为单一 `ui-settings`） |
+| `0.2.0-rc.1` / `0.2.0-rc.2` | `dsh-0.2.0-rc.2` | 0.2.0 把设置页拆成 `ui-settings-*` 子包后的版本（2026-10-01 验证） |
+| 其它 / 未知 | 取最新 tag | 未单独锁定，请自行验证并到仓库提 issue |
+
+不必手挑——仓库根目录的 [`tools/install.sh`](./tools/install.sh)（Git Bash）与 [`tools/install.ps1`](./tools/install.ps1) 会自动跑 `dsh --version` 探测你本机版本，挑出对应 tag，装进指定 profile 的 `node_modules/@gw/`：
+
+```bash
+bash tools/install.sh            # 探测 dsh 版本 → 选 tag → 装进 web profile
+bash tools/install.sh desktop    # 装进 desktop profile
+```
+
+> 在仓库目录内运行安装器时，它装的是**你当前 git checkout 的版本**（请先 `git checkout` 到对应 tag）；在仓库外运行则从 GitHub 拉对应 tag。
 
 ## 卸载
 
