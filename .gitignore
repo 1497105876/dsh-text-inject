@@ -58,3 +58,7 @@ desktop.ini
 .tmp/
 .temp/
 __pycache__/
+
+# ── 安装器 / 本地工具（非插件包内容，按 dsh 版本选装用）──
+tools/install.sh
+tools/install.ps1
