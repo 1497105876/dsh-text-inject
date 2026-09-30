@@ -28,6 +28,9 @@
   "engines": {
     "node": ">=18"
   },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.1.2-rc.1"
+  },
   "keywords": [
     "deepseek-harness",
     "dsh",
@@ -50,15 +53,6 @@
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-settings"
       ]
-    },
-    "compatibility": {
-      "dshReleases": {
-        "0.1.2-rc.1": "compatible",
-        "0.1.5-rc.1": "compatible",
-        "0.1.5-rc.2": "compatible",
-        "0.1.7-rc.2": "compatible",
-        "0.2.0-rc.2": "compatible"
-      }
     }
   }
 }
