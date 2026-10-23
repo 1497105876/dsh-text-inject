@@ -40,7 +40,7 @@
 
 3. 重启 dsh，打开设置页 → 左侧栏出现「**文字注入**」。
 
-数据文件默认在 `~/.dsh/text-inject/inject.md`，插件首次加载会自动创建（含示例块）。
+数据文件默认在 `~/.dsh/profiles/<profile>/text-inject/inject.md`（识别到 dsh profile 时；未识别则回落 `~/.dsh/text-inject/inject.md`），插件首次加载会自动创建（含示例块）。
 想换位置，在 loader 入口加 `config.file`：
 
 ```yaml
@@ -103,12 +103,12 @@ dsh 在加载前只校验插件 `peerDependencies["@deepseek-ai/dsh"]` 是否满
 
 1. 删掉 profile `cordis.patch.yml` 里的 `gw-text-inject` insert 块。
 2. 删除 `node_modules/@gw/dsh-text-inject/`。
-3. 数据文件 `~/.dsh/text-inject/`（含 `history/`）可按需保留或删除。
+3. 数据文件 `~/.dsh/text-inject/`（旧全局目录）与各 profile 的 `~/.dsh/profiles/<profile>/text-inject/`（含 `history/`）可按需保留或删除。
 4. 重启 dsh。
 
 ## 权限与数据
 
-- 读写的只有一份文件：默认 `~/.dsh/text-inject/inject.md` 及其 `history/` 备份（可在 loader 配置里改到任意路径）。
+- 读写的只有一份文件：默认 profile 专属目录下的 `inject.md` 及其 `history/` 备份（识别不到 profile 时回落 `~/.dsh/text-inject/`；可在 loader 配置里改到任意路径）。
 - 不访问网络、不读凭据、不上报任何数据。
 - 前端与 host 之间走 dsh 自己的 webServer **同源**路由（`/gw-text-inject/*`），不额外开端口、无跨域。
 - 注入的内容会进入每一轮请求，等于放大提示词体积——`[context]` 块建议配 `trigger`，别全量常驻，否则白白烧 token。
