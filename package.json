@@ -1,6 +1,6 @@
 {
   "name": "@gw/dsh-text-inject",
-  "version": "0.2.0-rc.3",
+  "version": "2.1.1001",
   "description": "在 dsh 官方设置页左侧栏添加「文字注入」：把文字注入系统提示词或会话上下文，内容存于独立文件，支持热加载与历史备份。Text injection into the system prompt or session context from a DSH Settings page, persisted in a standalone file with hot-reload and history.",
   "license": "MIT",
   "author": "gw",
@@ -26,10 +26,11 @@
     "README.md"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=18",
+    "dsh": ">=0.2.1-rc.2 <0.3.0"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh": ">=0.1.2-rc.1"
+    "@deepseek-ai/dsh": ">=0.2.1-rc.2 <0.3.0"
   },
   "keywords": [
     "deepseek-harness",
