@@ -1,6 +1,6 @@
 {
   "name": "@gw/dsh-text-inject",
-  "version": "2.1.1001",
+  "version": "2.1.101",
   "description": "在 dsh 官方设置页左侧栏添加「文字注入」：把文字注入系统提示词或会话上下文，内容存于独立文件，支持热加载与历史备份。Text injection into the system prompt or session context from a DSH Settings page, persisted in a standalone file with hot-reload and history.",
   "license": "MIT",
   "author": "gw",
